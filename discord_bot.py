@@ -2,7 +2,7 @@ import discord
 from discord.ext import commands
 import json
 
-TOKEN = "MTQ4OTk3NTQ1OTE2MzY3MjY1Nw.GUoGcX.ikG2kwYa8saHIcuTTSx9CC_A8q9hGEont-o3pI"
+TOKEN = "MTQ4OTk3NTQ1OTE2MzY3MjY1Nw.GY2d3b.znuGNyBiiRQBlXSzQCS-JIjepUxLT-a7fS7tKU"
 
 DRIVERS_FILE = "drivers.json"
 
