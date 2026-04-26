@@ -1,8 +1,9 @@
 import discord
 from discord.ext import commands
 import json
+import os
 
-TOKEN = "MTQ4OTk3NTQ1OTE2MzY3MjY1Nw.GY2d3b.znuGNyBiiRQBlXSzQCS-JIjepUxLT-a7fS7tKU"
+TOKEN = os.gentev("DISCORD_TOKEN")
 
 DRIVERS_FILE = "drivers.json"
 
