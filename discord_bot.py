@@ -3,7 +3,7 @@ from discord.ext import commands
 import json
 import os
 
-TOKEN = os.getev("DISCORD_TOKEN")
+TOKEN = os.getenv("DISCORD_TOKEN")
 
 DRIVERS_FILE = "drivers.json"
 
