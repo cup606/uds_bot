@@ -53,6 +53,14 @@ def get_tier(elo):
     else:
         return "TIER 7"
 
+def calculate_elo_change(rating_winner, rating_loser, k_factor=32):
+    """Вычисляет дельту по классической формуле Эло"""
+    # Ожидаемый результат для победителя
+    expected_winner = 1 / (1 + 10 ** ((rating_loser - rating_winner) / 400))
+    # Изменение рейтинга (округляем)
+    change = round(k_factor * (1 - expected_winner))
+    # Гарантируем, что за победу дадут хотя бы 1 балл
+    return max(change, 1)
 
 def save_data(data):
     with open(DATA_FILE, "w") as f:
@@ -120,8 +128,11 @@ async def handle_post(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         data[winner]["vs"][loser] += 1
 
-        data[winner]["elo"] += 25
-        data[loser]["elo"] -= 15
+        # --- НОВЫЙ БЛОК ЭЛО ---
+        elo_change = calculate_elo_change(data[winner]["elo"], data[loser]["elo"])
+        data[winner]["elo"] += elo_change
+        data[loser]["elo"] -= elo_change
+        # ----------------------
 
         if data[loser]["elo"] < 0:
             data[loser]["elo"] = 0
@@ -393,8 +404,11 @@ async def result_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     data[winner]["vs"][loser] += 1
 
-    data[winner]["elo"] += 25
-    data[loser]["elo"] -= 15
+     # --- НОВЫЙ БЛОК ЭЛО ---
+    elo_change = calculate_elo_change(data[winner]["elo"], data[loser]["elo"])
+    data[winner]["elo"] += elo_change
+    data[loser]["elo"] -= elo_change
+    # ----------------------
 
     if data[loser]["elo"] < 0:
         data[loser]["elo"] = 0
