@@ -41,9 +41,9 @@
         }
     },
     "Anuar": {
-        "wins": 5,
-        "runs": 12,
-        "elo": 1020,
+        "wins": 6,
+        "runs": 13,
+        "elo": 1045,
         "vs": {
             "Maga": 1,
             "Fox": 1,
@@ -54,7 +54,8 @@
             "Yoyka": 1,
             "Straw": 1,
             "Seen": 0,
-            "Faultless": 0
+            "Faultless": 0,
+            "Haffen": 1
         }
     },
     "Kusk": {
@@ -217,7 +218,7 @@
             "Brembo": 1,
             "Sirius": 1,
             "Yuki": 1,
-            "Fast": 0
+            "Anuar": 0
         }
     },
     "Alisa": {
@@ -293,14 +294,6 @@
         "elo": 985,
         "vs": {
             "Athlete": 0
-        }
-    },
-    "Fast": {
-        "wins": 1,
-        "runs": 1,
-        "elo": 1025,
-        "vs": {
-            "Haffen": 1
         }
     },
     "Die": {
