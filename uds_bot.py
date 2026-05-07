@@ -62,6 +62,7 @@ def calculate_elo_change(rating_winner, rating_loser, k_factor=32):
     # Гарантируем, что за победу дадут хотя бы 1 балл
     return max(change, 1)
 
+
 def save_data(data):
     with open(DATA_FILE, "w") as f:
         json.dump(data, f, indent=4)
@@ -108,7 +109,10 @@ async def handle_post(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     "wins": 0,
                     "runs": 0,
                     "elo": 1000,
-                    "vs": {}
+                    "vs": {},
+                    "streak": 0,
+                    "active": True
+
                 }
 
         data[driver1]["runs"] += 1
@@ -136,6 +140,22 @@ async def handle_post(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         if data[loser]["elo"] < 0:
             data[loser]["elo"] = 0
+
+# --- ОБНОВЛЕНИЕ СТРИКОВ ---
+        # Победитель
+        w_streak = data[winner].get("streak", 0)
+        if w_streak >= 0:
+            data[winner]["streak"] = w_streak + 1
+        else:
+            data[winner]["streak"] = 1  # Прервал серию поражений
+
+        # Проигравший
+        l_streak = data[loser].get("streak", 0)
+        if l_streak <= 0:
+            data[loser]["streak"] = l_streak - 1
+        else:
+            data[loser]["streak"] = -1  # Прервал серию побед
+        # --------------------------
 
         save_data(data)
 
@@ -386,7 +406,10 @@ async def result_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 "wins": 0,
                 "runs": 0,
                 "elo": 1000,
-                "vs": {}
+                "vs": {},
+                "streak": 0,
+                "active": True
+
             }
 
     data[driver1]["runs"] += 1
@@ -409,9 +432,25 @@ async def result_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     data[winner]["elo"] += elo_change
     data[loser]["elo"] -= elo_change
     # ----------------------
-
+    
     if data[loser]["elo"] < 0:
         data[loser]["elo"] = 0
+
+# --- ОБНОВЛЕНИЕ СТРИКОВ ---
+        # Победитель
+    w_streak = data[winner].get("streak", 0)
+    if w_streak >= 0:
+        data[winner]["streak"] = w_streak + 1
+    else:
+        data[winner]["streak"] = 1  # Прервал серию поражений
+
+    # Проигравший
+    l_streak = data[loser].get("streak", 0)
+    if l_streak <= 0:
+        data[loser]["streak"] = l_streak - 1
+    else:
+        data[loser]["streak"] = -1  # Прервал серию побед
+        # --------------------------
 
     save_data(data)
 
@@ -460,6 +499,9 @@ async def megadiv_command(update, context):
     mega_list = []
 
     for name, stats in data.items():
+        # ПРОПУСКАЕМ, если актив равен False
+        if not stats.get("active", True):
+            continue
 
         elo = stats["elo"]
         tier = get_tier(elo)
@@ -488,6 +530,9 @@ async def prodiv_command(update, context):
     pro_list = []
 
     for name, stats in data.items():
+        # ПРОПУСКАЕМ, если актив равен False
+        if not stats.get("active", True):
+            continue
 
         elo = stats["elo"]
         tier = get_tier(elo)
@@ -516,6 +561,9 @@ async def standarddiv_command(update, context):
     standard_list = []
 
     for name, stats in data.items():
+        # ПРОПУСКАЕМ, если актив равен False
+        if not stats.get("active", True):
+            continue
 
         elo = stats["elo"]
         tier = get_tier(elo)
@@ -537,6 +585,155 @@ async def standarddiv_command(update, context):
         text += f"{i}. {name} — {elo} ({tier})\n"
 
     await update.message.reply_text(text)
+
+async def predict_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    chat_id = update.message.chat.id
+    if chat_id not in ALLOWED_CHATS:
+        return
+
+    if len(context.args) < 2:
+        await update.message.reply_text("Используй: /predict Пилот1 Пилот2")
+        return
+
+    p1, p2 = context.args[0], context.args[1]
+    data = load_data()
+
+    if p1 not in data or p2 not in data:
+        await update.message.reply_text("Один из пилотов не найден в базе")
+        return
+
+    # 1. БАЗОВАЯ ВЕРОЯТНОСТЬ (ЭЛО)
+    r1, r2 = data[p1].get("elo", 1000), data[p2].get("elo", 1000)
+    prob1 = 1 / (1 + 10 ** ((r2 - r1) / 400))
+
+    # 2. КОРРЕКТИРОВКА ПО H2H (Личные встречи)
+    h2h_w1 = data[p1].get("vs", {}).get(p2, 0)
+    h2h_w2 = data[p2].get("vs", {}).get(p1, 0)
+    total_h2h = h2h_w1 + h2h_w2
+    
+    h2h_bonus = 0
+    if total_h2h > 0:
+        # Если один доминирует в личках, даем бонус до 10%
+        h2h_bonus = ((h2h_w1 / total_h2h) - 0.5) * 0.2
+
+    # 3. КОРРЕКТИРОВКА ПО ФОРМЕ (Стрики)
+    s1, s2 = data[p1].get("streak", 0), data[p2].get("streak", 0)
+    # За каждую победу в стрике +2%, за поражение -2% (макс бонус 10%)
+    streak_bonus = (max(min(s1, 5), -5) * 0.02) - (max(min(s2, 5), -5) * 0.02)
+
+    # ИТОГОВЫЙ ШАНС
+    final_prob = max(min(prob1 + h2h_bonus + streak_bonus, 0.98), 0.02)
+    
+    # ТЕКСТОВОЕ ОБОСНОВАНИЕ
+    def get_form_label(s):
+        if s >= 5: return "Успех"
+        if s >= 3: return "📈 На подъеме"
+        if s <= -5: return "Провал"
+        if s <= -3: return "📉 На спаде"
+        return "Стабилен"
+
+    chance1 = round(final_prob * 100)
+    chance2 = 100 - chance1
+
+    report = (
+        f"📊 АНАЛИТИКА МАТЧА\n"
+        f"🏎 {p1} vs {p2}\n"
+        f"──────────────────\n"
+        f"Шансы на победу:\n"
+        f"● {p1}: {chance1}%\n"
+        f"● {p2}: {chance2}%\n\n"
+        f"Состояние пилотов:\n"
+        f"👤 {p1}: {get_form_label(s1)} (Стрик: {s1})\n"
+        f"👤 {p2}: {get_form_label(s2)} (Стрик: {s2})\n\n"
+        f"Личные встречи: {h2h_w1}:{h2h_w2}\n"
+        f"──────────────────\n"
+        f"💡 _Прогноз учитывает рейтинг, историю встреч и текущую форму_"
+    )
+
+    await update.message.reply_text(report, parse_mode="Markdown")
+
+async def set_status_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    chat_id = update.message.chat.id
+    user_id = update.message.from_user.id
+
+    if chat_id not in ALLOWED_CHATS:
+        return
+
+    # Твоя проверка на админа (как в /result)
+    member = await context.bot.get_chat_member(chat_id, user_id)
+    if member.status not in ["administrator", "creator"]:
+        await update.message.reply_text("Эта команда только для администрации.")
+        return
+
+    if len(context.args) < 2:
+        await update.message.reply_text("Используй: /setstatus Имя 0 (инактив) или 1 (актив)")
+        return
+
+    name = context.args[0]
+    # Если ввели 1 — активен, если 0 — инактивен
+    is_active = context.args[1] == "1"
+    
+    data = load_data()
+    if name in data:
+        data[name]["active"] = is_active
+        save_data(data)
+        status_text = "АКТИВЕН" if is_active else "ИНАКТИВЕН"
+        await update.message.reply_text(f"✅ Статус пилота {name} изменен на {status_text}")
+    else:
+        await update.message.reply_text("Пилот не найден в базе.")
+
+async def infopilot_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.message.chat.id not in ALLOWED_CHATS:
+        return
+
+    if not context.args:
+        await update.message.reply_text("Используй: /infopilot Имя")
+        return
+
+    name = context.args[0]
+    data = load_data()
+
+    if name not in data:
+        await update.message.reply_text("Пилот не найден")
+        return
+
+    p = data[name]
+    status = "🟢 Активен" if p.get("active", True) else "🔴 Инактив"
+    
+    text = (
+        f"📋 **ИНФО: {name}**\n"
+        f"Статус: {status}\n"
+        f"Рейтинг: {p.get('elo', 1000)} ELO\n"
+        f"Стрик: {p.get('streak', 0)}\n"
+        f"Всего заездов: {p['runs']}\n"
+        f"──────────────────\n"
+        f"⚔️ **ЛИЧНЫЕ ВСТРЕЧИ:**\n"
+    )
+
+    history = p.get("vs", {})
+    if not history:
+        text += "История пуста."
+    else:
+        for opp, wins in history.items():
+            # Чтобы найти поражения, смотрим победы оппонента над нами
+            losses = data.get(opp, {}).get("vs", {}).get(name, 0)
+            text += f"vs {opp} — {wins}:{losses}\n"
+
+    await update.message.reply_text(text, parse_mode="Markdown")
+
+async def inactives_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    data = load_data()
+    inactive_list = [name for name, s in data.items() if not s.get("active", True)]
+
+    if not inactive_list:
+        await update.message.reply_text("Неактивных пилотов нет.")
+        return
+
+    text = "💤 **СПИСОК ИНАКТИВОВ:**\n\n"
+    for i, name in enumerate(inactive_list, 1):
+        text += f"{i}. {name}\n"
+    
+    await update.message.reply_text(text, parse_mode="Markdown")
 
 app = ApplicationBuilder().token(TOKEN).build()
 
@@ -601,6 +798,30 @@ app.add_handler(
     CommandHandler(
         "standarddiv",
         standarddiv_command
+    )
+)
+app.add_handler(
+    CommandHandler(
+        "predict",
+        predict_command
+    )
+)
+app.add_handler(
+    CommandHandler(
+        "setstatus",
+        set_status_command
+    )
+)
+app.add_handler(
+    CommandHandler(
+        "infopilot",
+        infopilot_command
+    )
+)
+app.add_handler(
+    CommandHandler(
+        "inactives",
+        inactives_command
     )
 )
 
