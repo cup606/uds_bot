@@ -735,6 +735,28 @@ async def inactives_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     await update.message.reply_text(text, parse_mode="Markdown")
 
+async def getdb_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    # КРИТИЧЕСКАЯ ПРОВЕРКА: Только твой ID
+    YOUR_ADMIN_ID = 5415209528
+    
+    if update.message.from_user.id != YOUR_ADMIN_ID:
+        # Бот просто промолчит или напишет "Отказ", если пишет кто-то другой
+        return 
+
+    if os.path.exists(DATA_FILE):
+        try:
+            with open(DATA_FILE, 'rb') as f:
+                await context.bot.send_document(
+                    chat_id=update.effective_chat.id,
+                    document=f,
+                    filename="drivers.json",
+                    caption="📂 Вот твоя база данных. Скачай и сохрани её."
+                )
+        except Exception as e:
+            await update.message.reply_text(f"Ошибка при отправке файла: {e}")
+    else:
+        await update.message.reply_text("Файл базы данных не найден на сервере.")
+
 app = ApplicationBuilder().token(TOKEN).build()
 
 # RESULT обработчик
@@ -822,6 +844,12 @@ app.add_handler(
     CommandHandler(
         "inactives",
         inactives_command
+    )
+)
+app.add_handler(
+    CommandHandler(
+        "getdb",
+        getdb_command
     )
 )
 
