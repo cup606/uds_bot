@@ -612,7 +612,7 @@
             "Hovs": 0,
             "Tobi": 1,
             "Tvink": 1,
-            "Nezso": 1,
+            "Nexso": 1,
             "Fronky": 1,
             "Rima": 0,
             "Void": 1,
@@ -783,9 +783,10 @@
     },
     "Nexso": {
         "wins": 7,
-        "runs": 11,
-        "elo": 1050,
+        "runs": 12,
+        "elo": 1040,
         "vs": {
+            "Kadzuhiko": 0,
             "Abas": 1,
             "Mitsuoka": 1,
             "Fllaur": 1,
@@ -826,14 +827,6 @@
         "vs": {
             "Tobi": 0,
             "Fancy": 0
-        }
-    },
-    "Nezso": {
-        "wins": 0,
-        "runs": 1,
-        "elo": 986,
-        "vs": {
-            "Kadzuhiko": 0
         }
     },
     "Fury": {
